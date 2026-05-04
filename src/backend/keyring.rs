@@ -78,6 +78,7 @@ mod tests {
     }
 
     #[test]
+    #[cfg(target_os = "macos")]
     fn roundtrip_set_then_resolve() {
         let backend = KeyringBackend;
         let path = "belmont-test/roundtrip-test";
