@@ -22,10 +22,11 @@ belmont set <name> [val]  # store a secret in its backend
 belmont run <command>     # execute with secrets injected, output scrubbed
 ```
 
-A typical run:
+A typical run (use single quotes so your shell doesn't expand the
+variable before belmont injects it):
 
 ```sh
-belmont run -- curl -H "Authorization: Bearer $API_KEY" https://api.example.com
+belmont run -- 'curl -H "Authorization: Bearer $API_KEY" https://api.example.com'
 ```
 
 ## How it works
@@ -45,6 +46,8 @@ replaces any occurrence of a secret value in the PTY output with
 strings never appear in output sent to the inference API.
 
 ## Backends
+
+Two backends today:
 
 - **Environment** (`ref+env://VAR`) — reads from the host environment.
   Read-only.
