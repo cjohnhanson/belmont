@@ -1,30 +1,31 @@
-# 🧛 belmont
+# belmont
 
-> _What is a man? A miserable little pile of secrets._ Insecure
-> 'best-effort' secret management for supplying credentials to LLM agents.
-
-Belmont resolves secrets from pluggable backends and injects them into
-commands at runtime. It scrubs secret values from command output in real
-time so agents can use credentials without seeing them.
-
-## Threat model
-
-The goal is to prevent the most common LLM agent exfiltration patterns:
-an agent cat'ing a `.env` file, echoing an environment variable while
-troubleshooting API auth, or otherwise directly reading credentials
-through standard shell operations.
-
-An agent that actively tries to extract secrets through side channels
-(inspecting `/proc` for a subshell's environment, running a localhost
-echo server and curling to it) can probably succeed. **This is a
-solo-developed codebase. I am not a security researcher. Do not use
-this for anything security-critical. I do not use this in my own
-professional work.**
+Belmont is a secrets manager for LLM coding agents. It resolves
+credentials from pluggable backends, injects them into commands at
+runtime, and scrubs the resolved values out of command output before an
+agent sees them — so an agent can use a secret without the secret
+landing in its context window.
 
 ## Install
 
 ```sh
 cargo install --git https://github.com/cjohnhanson/belmont
+```
+
+## Usage
+
+```sh
+belmont init              # create belmont.yml
+belmont list              # show declared secret references (never values)
+belmont check             # verify all secrets are resolvable
+belmont set <name> [val]  # store a secret in its backend
+belmont run <command>     # execute with secrets injected, output scrubbed
+```
+
+A typical run:
+
+```sh
+belmont run -- curl -H "Authorization: Bearer $API_KEY" https://api.example.com
 ```
 
 ## How it works
@@ -37,17 +38,11 @@ secrets:
   API_KEY: "ref+keyring://belmont/API_KEY"
 ```
 
-Run a command with secrets injected:
-
-```sh
-belmont run -- curl -H "Authorization: Bearer $API_KEY" https://api.example.com
-```
-
-Belmont resolves each secret from its backend, sets them as environment
+`belmont run` resolves each reference, sets the values as environment
 variables on the child process, executes the command in a PTY, and
-replaces any secret values in the PTY output with `belmont://NAME`
-before the output reaches the agent. The actual secret strings never
-appear in output sent to the inference API.
+replaces any occurrence of a secret value in the PTY output with
+`belmont://NAME` before the output reaches the agent. The actual secret
+strings never appear in output sent to the inference API.
 
 ## Backends
 
@@ -55,17 +50,23 @@ appear in output sent to the inference API.
   Read-only.
 - **Keyring** (`ref+keyring://SERVICE/ACCOUNT`) — reads from the OS
   credential store (macOS Keychain, Windows Credential Manager, Linux
-  secret-service). Supports both read and write.
+  secret-service). Read and write.
 
-## Usage
+## Threat model
 
-```sh
-belmont init              # create belmont.yml
-belmont list              # show declared secret references (never values)
-belmont check             # verify all secrets are resolvable
-belmont set <name> [val]  # store a secret in its backend
-belmont run <command>     # execute with secrets injected, output scrubbed
-```
+Belmont targets the most common LLM agent exfiltration patterns: an
+agent cat'ing a `.env` file, echoing an environment variable while
+troubleshooting API auth, or otherwise reading credentials through
+ordinary shell operations. For those cases, scrubbing the value out of
+PTY output is enough.
+
+An agent that actively tries to extract secrets through side channels —
+inspecting `/proc` for a subshell's environment, running a localhost
+echo server and curling to it, base64-encoding values before printing
+them — can probably succeed. Belmont does not defend against that.
+
+This is a solo-developed codebase. The author is not a security
+researcher. Do not use it for anything security-critical.
 
 ## Related
 
