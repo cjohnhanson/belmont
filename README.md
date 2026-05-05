@@ -21,6 +21,11 @@ solo-developed codebase. I am not a security researcher. Do not use
 this for anything security-critical. I do not use this in my own
 professional work.**
 
+## Install
+
+```sh
+cargo install --git https://github.com/cjohnhanson/belmont
+```
 
 ## How it works
 
@@ -34,15 +39,15 @@ secrets:
 
 Run a command with secrets injected:
 
-```
+```sh
 belmont run -- curl -H "Authorization: Bearer $API_KEY" https://api.example.com
 ```
 
-Belmont resolves each secret from its backend, sets them as
-environment variables on the child process, executes the command in
-a PTY, and replaces any secret values in the PTY output with
-`belmont://NAME` before the output reaches the agent. The actual
-secret strings never appear in output sent to the inference API.
+Belmont resolves each secret from its backend, sets them as environment
+variables on the child process, executes the command in a PTY, and
+replaces any secret values in the PTY output with `belmont://NAME`
+before the output reaches the agent. The actual secret strings never
+appear in output sent to the inference API.
 
 ## Backends
 
@@ -54,10 +59,25 @@ secret strings never appear in output sent to the inference API.
 
 ## Usage
 
-```
+```sh
 belmont init              # create belmont.yml
 belmont list              # show declared secret references (never values)
 belmont check             # verify all secrets are resolvable
 belmont set <name> [val]  # store a secret in its backend
 belmont run <command>     # execute with secrets injected, output scrubbed
 ```
+
+## Related
+
+A loose ecosystem of tools sharing the same shape: plaintext,
+git-tracked, agent-readable, no external services.
+
+- [tisket](https://github.com/cjohnhanson/tisket) — file-based issue tracker
+- [zettel](https://github.com/cjohnhanson/zettel) — zettelkasten knowledge base
+- [almanac](https://github.com/cjohnhanson/almanac) — agent skill aggregator
+- [mdstore](https://github.com/cjohnhanson/mdstore) — frontmattered markdown library
+- [codelikecody](https://github.com/cjohnhanson/codelikecody) — workflow engine that bundles these
+
+## License
+
+MIT.
