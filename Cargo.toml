@@ -3,6 +3,13 @@ name = "belmont"
 version = "0.1.0"
 edition = "2024"
 description = "Secrets management for coding agents"
+license = "MIT"
+repository = "https://github.com/cjohnhanson/belmont"
+homepage = "https://github.com/cjohnhanson/belmont"
+readme = "README.md"
+authors = ["Cody Hanson"]
+keywords = ["secrets", "keychain", "credentials", "cli"]
+categories = ["command-line-utilities"]
 
 [dependencies]
 camino = { version = "1", features = ["serde1"] }
