@@ -6,10 +6,10 @@ use portable_pty::{CommandBuilder, PtySize, native_pty_system};
 use crate::error::Result;
 use crate::scrub::Scrubber;
 
-/// Run a command inside a PTY with secrets injected as environment variables
-/// and output scrubbed of secret values.
+/// Run a command in a PTY. Inject the secrets as environment variables. Scrub
+/// the secret values out of the output.
 ///
-/// Returns the subprocess exit code.
+/// Return the exit code of the subprocess.
 pub fn run_command(
     command: &[String],
     secrets: BTreeMap<String, String>,
@@ -39,7 +39,7 @@ pub fn run_command(
         .spawn_command(cmd)
         .map_err(|e| std::io::Error::other(e.to_string()))?;
 
-    // Drop slave so we get EOF when the child exits.
+    // Drop the slave. The reader then gets EOF when the child exits.
     drop(pair.slave);
 
     let mut reader = pair
@@ -47,7 +47,7 @@ pub fn run_command(
         .try_clone_reader()
         .map_err(|e| std::io::Error::other(e.to_string()))?;
 
-    // Read in chunks, scrub, and write to stdout.
+    // Read the output in chunks, scrub it, and write it to stdout.
     let mut buf = [0u8; 4096];
     loop {
         match reader.read(&mut buf) {
@@ -64,7 +64,7 @@ pub fn run_command(
         }
     }
 
-    // Flush remaining buffered content.
+    // Flush the remaining buffered content.
     let remaining = scrubber.flush();
     if !remaining.is_empty() {
         print!("{remaining}");
@@ -99,9 +99,8 @@ mod tests {
 
         let mut scrubber = Scrubber::new(entries);
 
-        // Capture stdout by running in a way we can collect output.
-        // For testing, we reimplement the core loop to collect into a string
-        // instead of printing.
+        // The test collects the output instead of printing it. It repeats the
+        // core loop and writes the output into a string.
         let pty_system = native_pty_system();
         let pair = pty_system
             .openpty(PtySize {
@@ -204,7 +203,7 @@ mod tests {
 
     #[test]
     fn secret_in_stderr_also_scrubbed() {
-        // PTY merges stdout and stderr, so stderr secrets should also be scrubbed
+        // The PTY merges stdout and stderr. Belmont scrubs the stderr secrets too.
         let (output, code) = run_with_secrets(
             "echo $MY_SECRET >&2",
             vec![("MY_SECRET", "stderr-secret")],

@@ -9,7 +9,7 @@ pub enum Error {
     #[error("unknown backend scheme '{0}'")]
     UnknownBackend(String),
 
-    #[error("secret '{0}' could not be resolved")]
+    #[error("cannot resolve secret '{0}'")]
     UnresolvableSecret(String),
 
     #[error("invalid ref URI '{0}'")]

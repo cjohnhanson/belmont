@@ -1,21 +1,23 @@
-/// A streaming scrubber that replaces secret values with `belmont://NAME` references.
+/// A streaming scrubber. It replaces each secret value with a `belmont://NAME`
+/// reference.
 ///
-/// Maintains a boundary buffer to handle secrets split across chunk boundaries.
-/// Values are sorted longest-first so a value that is a substring of another
-/// gets replaced correctly.
+/// The scrubber keeps a boundary buffer. The buffer holds a secret that spans
+/// two chunks. The scrubber sorts the values longest first. A value that is a
+/// substring of another value then gets the correct replacement.
 pub struct Scrubber {
-    /// Secret entries sorted by value length (longest first).
+    /// The secret entries, sorted by value length, longest first.
     entries: Vec<(String, String)>,
-    /// Trailing bytes from the previous `feed()` call that might contain
-    /// the start of a secret value spanning a chunk boundary.
+    /// The trailing bytes from the previous `feed()` call. They can hold the
+    /// start of a secret value that spans a chunk boundary.
     buffer: String,
-    /// Length of the longest secret value — determines boundary buffer size.
+    /// The length of the longest secret value. It sets the size of the
+    /// boundary buffer.
     max_len: usize,
 }
 
 impl Scrubber {
-    /// Create a new scrubber from name/value pairs.
-    /// Empty values are filtered out. Values are sorted longest-first.
+    /// Create a scrubber from name and value pairs. The scrubber removes the
+    /// empty values. It sorts the values longest first.
     pub fn new(entries: Vec<(String, String)>) -> Self {
         let mut entries: Vec<(String, String)> = entries
             .into_iter()
@@ -30,8 +32,8 @@ impl Scrubber {
         }
     }
 
-    /// Feed a chunk of output. Returns the safely-scrubbed prefix.
-    /// Retains up to `max_len` bytes in the boundary buffer.
+    /// Feed a chunk of output. Return the prefix that is safe to emit. The
+    /// scrubber keeps up to `max_len` bytes in the boundary buffer.
     pub fn feed(&mut self, chunk: &str) -> String {
         if self.entries.is_empty() {
             return chunk.to_string();
@@ -40,46 +42,45 @@ impl Scrubber {
         self.buffer.push_str(chunk);
 
         if self.buffer.len() <= self.max_len {
-            // Not enough data to guarantee no secret spans the boundary.
+            // There is not enough data. A secret can still span the boundary.
             return String::new();
         }
 
-        // Everything before the last max_len bytes is safe to emit.
+        // The bytes before the last max_len bytes are safe to emit.
         let emit_len = self.buffer.len() - self.max_len;
         let scrubbed_full = self.scrub_text(&self.buffer);
         let remaining_original = self.buffer[emit_len..].to_string();
         self.buffer = remaining_original;
 
-        // We need to emit the scrubbed version of the prefix.
-        // Scrub prefix and tail separately won't work (secret could span).
-        // Scrub the whole thing, then figure out where to cut.
+        // The scrubber must emit the scrubbed prefix. It cannot scrub the
+        // prefix and the tail separately, because a secret can span the two.
+        // So it scrubs the full buffer and then finds the cut point.
         //
-        // The correct approach: scrub the full buffer. The emittable portion
-        // is everything that maps to original bytes before emit_len.
-        // Since scrubbing can change string lengths, we track by re-scrubbing
-        // the remaining buffer and subtracting.
+        // The emittable part is everything that maps to the original bytes
+        // before emit_len. Scrubbing changes the string length, so the
+        // scrubber scrubs the remaining buffer again and subtracts it.
         let scrubbed_remaining = self.scrub_text(&self.buffer);
 
-        // The emitted portion is: scrubbed_full with scrubbed_remaining stripped
-        // from the end. This works because the tail is still in self.buffer.
+        // The emitted part is scrubbed_full without scrubbed_remaining at the
+        // end. This works because the tail is still in self.buffer.
         if let Some(prefix) = scrubbed_full.strip_suffix(&scrubbed_remaining) {
             return prefix.to_string();
         }
 
-        // Fallback: if stripping doesn't work cleanly (overlapping replacements
-        // changed boundaries), emit the scrubbed full and clear the buffer.
-        // This sacrifices the boundary guarantee but avoids data loss.
+        // Fallback. Overlapping replacements can move the boundaries and stop
+        // the strip from working. Then emit the full scrubbed buffer and clear
+        // the buffer. This drops the boundary guarantee, but it loses no data.
         self.buffer.clear();
         scrubbed_full
     }
 
-    /// Flush remaining buffered bytes at EOF.
+    /// Flush the remaining buffered bytes at EOF.
     pub fn flush(&mut self) -> String {
         let remaining = std::mem::take(&mut self.buffer);
         self.scrub_text(&remaining)
     }
 
-    /// Replace all secret values with their `belmont://NAME` references.
+    /// Replace every secret value with its `belmont://NAME` reference.
     fn scrub_text(&self, text: &str) -> String {
         let mut result = text.to_string();
         for (name, value) in &self.entries {
@@ -153,7 +154,7 @@ mod tests {
     fn flush_emits_remaining() {
         let mut s = make_scrubber(vec![("X", "secret")]);
         let out1 = s.feed("sec");
-        // Not enough data, buffered
+        // There is not enough data, so the scrubber buffers it
         assert_eq!(out1, "");
         let out2 = s.flush();
         assert_eq!(out2, "sec");
@@ -177,7 +178,7 @@ mod tests {
 
     #[test]
     fn substring_secret_not_replaced_when_longer_matches() {
-        // "pass" is a substring of "password", longer value wins
+        // "pass" is a substring of "password". The longer value wins.
         let mut s = make_scrubber(vec![("PARTIAL", "pass"), ("FULL", "password")]);
         let out = s.feed("my password is here");
         let out = format!("{out}{}", s.flush());

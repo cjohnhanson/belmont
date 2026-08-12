@@ -16,7 +16,7 @@ use crate::scrub::Scrubber;
     max_term_width = 98
 )]
 pub struct Args {
-    /// Root directory of the project (default: current directory)
+    /// The root directory of the project. The default is the current directory.
     #[arg(long, global = true, default_value = ".")]
     pub root: Utf8PathBuf,
 
@@ -26,30 +26,30 @@ pub struct Args {
 
 #[derive(Parser)]
 pub enum Command {
-    /// Initialize belmont in the current project
+    /// Initialize Belmont in the current project
     Init,
-    /// List declared secret references (never values)
+    /// List the declared secret references, never the values
     List,
-    /// Verify all secrets are resolvable
+    /// Check that Belmont can resolve every secret
     Check,
-    /// Run a command with secrets injected and output scrubbed
+    /// Run a command with the secrets injected and the output scrubbed
     Run(RunArgs),
-    /// Set a secret value in its backend
+    /// Store a secret value in its backend
     Set(SetArgs),
 }
 
 #[derive(Parser)]
 pub struct RunArgs {
-    /// Command and arguments to execute
+    /// The command and its arguments
     #[arg(trailing_var_arg = true, required = true)]
     pub command: Vec<String>,
 }
 
 #[derive(Parser)]
 pub struct SetArgs {
-    /// Secret name (as declared in belmont.yml)
+    /// The secret name, as declared in belmont.yml
     pub name: String,
-    /// Value to store (omit to read from stdin)
+    /// The value to store. Omit it to read the value from stdin.
     pub value: Option<String>,
 }
 
@@ -133,7 +133,7 @@ fn cmd_run(root: &Utf8PathBuf, run_args: &RunArgs) -> Result<()> {
     if !registry.all_resolved() {
         let missing = registry.missing();
         eprintln!(
-            "belmont: {} secret(s) missing, run `belmont check` for details",
+            "belmont: {} secret(s) missing. Run `belmont check` for details.",
             missing.len()
         );
         std::process::exit(1);

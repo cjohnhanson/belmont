@@ -3,7 +3,7 @@ use std::collections::BTreeMap;
 use crate::backend;
 use crate::config::BelmontConfig;
 
-/// Resolved secret: name, value, and whether resolution succeeded.
+/// A resolved secret. It holds the name, the value, and the error.
 #[derive(Debug)]
 pub struct ResolvedSecret {
     pub name: String,
@@ -11,13 +11,13 @@ pub struct ResolvedSecret {
     pub error: Option<String>,
 }
 
-/// Orchestrates secret resolution from config.
+/// Resolves the secrets that the config declares.
 pub struct SecretRegistry {
     resolved: Vec<ResolvedSecret>,
 }
 
 impl SecretRegistry {
-    /// Resolve all secrets declared in the config.
+    /// Resolve every secret that the config declares.
     pub fn resolve(config: &BelmontConfig) -> Self {
         let mut resolved = Vec::new();
         for (name, uri) in &config.secrets {
@@ -37,7 +37,7 @@ impl SecretRegistry {
         SecretRegistry { resolved }
     }
 
-    /// Names of secrets that could not be resolved.
+    /// The names of the secrets that Belmont could not resolve.
     pub fn missing(&self) -> Vec<&str> {
         self.resolved
             .iter()
@@ -46,7 +46,7 @@ impl SecretRegistry {
             .collect()
     }
 
-    /// Successfully resolved name/value pairs.
+    /// The name and value pairs that Belmont resolved.
     pub fn resolved_pairs(&self) -> Vec<(String, String)> {
         self.resolved
             .iter()
@@ -58,22 +58,22 @@ impl SecretRegistry {
             .collect()
     }
 
-    /// All declared secret names.
+    /// The names of all declared secrets.
     pub fn names(&self) -> Vec<&str> {
         self.resolved.iter().map(|s| s.name.as_str()).collect()
     }
 
-    /// All resolved secrets with their status.
+    /// All resolved secrets and their status.
     pub fn all(&self) -> &[ResolvedSecret] {
         &self.resolved
     }
 
-    /// Returns true if all secrets were resolved successfully.
+    /// Return true if Belmont resolved every secret.
     pub fn all_resolved(&self) -> bool {
         self.resolved.iter().all(|s| s.value.is_some())
     }
 
-    /// Build an environment variable map from resolved secrets.
+    /// Build an environment variable map from the resolved secrets.
     pub fn env_map(&self) -> BTreeMap<String, String> {
         self.resolved_pairs().into_iter().collect()
     }

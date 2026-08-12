@@ -10,13 +10,13 @@ pub struct RefUri {
     pub path: String,
 }
 
-/// Backend trait for resolving and storing secrets.
+/// The trait for a backend that resolves and stores secrets.
 pub trait Backend {
     /// Resolve a secret value from this backend.
     fn resolve(&self, path: &str) -> Result<String>;
 
-    /// Store a secret value in this backend.
-    /// Returns an error if the backend is read-only.
+    /// Store a secret value in this backend. Return an error if the backend is
+    /// read-only.
     fn set(&self, path: &str, value: &str) -> Result<()>;
 }
 
@@ -37,7 +37,7 @@ pub fn parse_ref_uri(uri: &str) -> Result<RefUri> {
     })
 }
 
-/// Get the backend implementation for a given scheme.
+/// Get the backend for the given scheme.
 fn backend_for(scheme: &str) -> Result<Box<dyn Backend>> {
     match scheme {
         "env" => Ok(Box::new(env::EnvBackend)),
@@ -46,13 +46,13 @@ fn backend_for(scheme: &str) -> Result<Box<dyn Backend>> {
     }
 }
 
-/// Resolve a ref URI to its secret value using the appropriate backend.
+/// Resolve a ref URI to its secret value. Use the backend for the scheme.
 pub fn resolve(uri: &str) -> Result<String> {
     let parsed = parse_ref_uri(uri)?;
     backend_for(&parsed.scheme)?.resolve(&parsed.path)
 }
 
-/// Store a value for a ref URI using the appropriate backend.
+/// Store a value for a ref URI. Use the backend for the scheme.
 pub fn set(uri: &str, value: &str) -> Result<()> {
     let parsed = parse_ref_uri(uri)?;
     backend_for(&parsed.scheme)?.set(&parsed.path, value)

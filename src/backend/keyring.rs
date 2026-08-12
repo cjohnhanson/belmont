@@ -2,19 +2,20 @@ use crate::error::{Error, Result};
 
 use super::Backend;
 
-/// Backend that reads and writes secrets via the OS credential store
-/// (macOS Keychain, Windows Credential Manager, Linux secret-service).
+/// The backend that reads and writes secrets in the OS credential store. The
+/// store is the macOS Keychain, the Windows Credential Manager, or the Linux
+/// secret-service.
 pub struct KeyringBackend;
 
-/// Parse a `SERVICE/ACCOUNT` path, returning (service, account).
+/// Parse a `SERVICE/ACCOUNT` path. Return the service and the account.
 fn parse_path(path: &str) -> Result<(&str, &str)> {
     let (service, account) = path
         .split_once('/')
-        .ok_or_else(|| Error::InvalidRefUri(format!("ref+keyring://{path} — expected SERVICE/ACCOUNT")))?;
+        .ok_or_else(|| Error::InvalidRefUri(format!("ref+keyring://{path} — the path must be SERVICE/ACCOUNT")))?;
 
     if service.is_empty() || account.is_empty() {
         return Err(Error::InvalidRefUri(format!(
-            "ref+keyring://{path} — service and account must not be empty"
+            "ref+keyring://{path} — the service and the account must not be empty"
         )));
     }
 
@@ -83,17 +84,17 @@ mod tests {
         let backend = KeyringBackend;
         let path = "belmont-test/roundtrip-test";
 
-        // Skip if no keychain is available (e.g. nix sandbox).
+        // Skip the test if no keychain is available, for example in the nix sandbox.
         if let Err(e) = backend.set(path, "test-value-12345") {
             eprintln!("skipping roundtrip test: {e}");
             return;
         }
 
-        // Resolve
+        // Resolve the value
         let value = backend.resolve(path).unwrap();
         assert_eq!(value, "test-value-12345");
 
-        // Cleanup
+        // Clean up
         let (service, account) = parse_path(path).unwrap();
         let entry = keyring::Entry::new(service, account).unwrap();
         let _ = entry.delete_credential();

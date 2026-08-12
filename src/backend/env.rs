@@ -2,7 +2,7 @@ use crate::error::{Error, Result};
 
 use super::Backend;
 
-/// Backend that reads secrets from environment variables.
+/// The backend that reads secrets from environment variables.
 pub struct EnvBackend;
 
 impl Backend for EnvBackend {
