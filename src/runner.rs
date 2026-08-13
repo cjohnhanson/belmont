@@ -74,9 +74,7 @@ pub fn run_command(
         .wait()
         .map_err(|e| std::io::Error::other(e.to_string()))?;
 
-    Ok(match status.exit_code() {
-        code => code as i32,
-    })
+    Ok(status.exit_code() as i32)
 }
 
 #[cfg(test)]

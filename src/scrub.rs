@@ -19,11 +19,9 @@ impl Scrubber {
     /// Create a scrubber from name and value pairs. The scrubber removes the
     /// empty values. It sorts the values longest first.
     pub fn new(entries: Vec<(String, String)>) -> Self {
-        let mut entries: Vec<(String, String)> = entries
-            .into_iter()
-            .filter(|(_, v)| !v.is_empty())
-            .collect();
-        entries.sort_by(|a, b| b.1.len().cmp(&a.1.len()));
+        let mut entries: Vec<(String, String)> =
+            entries.into_iter().filter(|(_, v)| !v.is_empty()).collect();
+        entries.sort_by_key(|(_, v)| std::cmp::Reverse(v.len()));
         let max_len = entries.first().map(|(_, v)| v.len()).unwrap_or(0);
         Scrubber {
             entries,
@@ -46,32 +44,53 @@ impl Scrubber {
             return String::new();
         }
 
-        // The bytes before the last max_len bytes are safe to emit.
-        let emit_len = self.buffer.len() - self.max_len;
-        let scrubbed_full = self.scrub_text(&self.buffer);
-        let remaining_original = self.buffer[emit_len..].to_string();
-        self.buffer = remaining_original;
-
-        // The scrubber must emit the scrubbed prefix. It cannot scrub the
-        // prefix and the tail separately, because a secret can span the two.
-        // So it scrubs the full buffer and then finds the cut point.
-        //
-        // The emittable part is everything that maps to the original bytes
-        // before emit_len. Scrubbing changes the string length, so the
-        // scrubber scrubs the remaining buffer again and subtracts it.
-        let scrubbed_remaining = self.scrub_text(&self.buffer);
-
-        // The emitted part is scrubbed_full without scrubbed_remaining at the
-        // end. This works because the tail is still in self.buffer.
-        if let Some(prefix) = scrubbed_full.strip_suffix(&scrubbed_remaining) {
-            return prefix.to_string();
+        // Cut the buffer at a point no secret spans. Everything before the
+        // cut is fully determined: a future chunk cannot change it, because
+        // a secret is at most max_len bytes and the cut retains that many.
+        // Scrubbing the prefix alone is therefore correct, and the tail
+        // stays buffered for the next chunk.
+        let cut = self.safe_cut();
+        if cut == 0 {
+            return String::new();
         }
+        let prefix = self.scrub_text(&self.buffer[..cut]);
+        self.buffer = self.buffer[cut..].to_string();
+        prefix
+    }
 
-        // Fallback. Overlapping replacements can move the boundaries and stop
-        // the strip from working. Then emit the full scrubbed buffer and clear
-        // the buffer. This drops the boundary guarantee, but it loses no data.
-        self.buffer.clear();
-        scrubbed_full
+    /// The largest safe cut point in the buffer, in bytes.
+    ///
+    /// The start is the last `max_len` bytes rounded down to a char
+    /// boundary, so no slice ever falls inside a multibyte character. The
+    /// cut then moves left past any secret occurrence that straddles it,
+    /// so a secret is never split across the cut.
+    fn safe_cut(&self) -> usize {
+        let mut cut = self.buffer.len() - self.max_len;
+        while !self.buffer.is_char_boundary(cut) {
+            cut -= 1;
+        }
+        loop {
+            let mut moved = false;
+            for (_, value) in &self.entries {
+                if value.is_empty() {
+                    continue;
+                }
+                let mut from = 0;
+                while let Some(rel) = self.buffer[from..].find(value.as_str()) {
+                    let start = from + rel;
+                    let end = start + value.len();
+                    if start < cut && end > cut {
+                        cut = start;
+                        moved = true;
+                        break;
+                    }
+                    from = start + 1;
+                }
+            }
+            if !moved {
+                return cut;
+            }
+        }
     }
 
     /// Flush the remaining buffered bytes at EOF.
@@ -174,6 +193,38 @@ mod tests {
         let out = s.feed("already has belmont://X in it");
         let out = format!("{out}{}", s.flush());
         assert_eq!(out, "already has belmont://X in it");
+    }
+
+    #[test]
+    fn non_ascii_output_does_not_panic_and_scrubs() {
+        // The old byte-slice at max_len fell inside a multibyte char and
+        // panicked. Multibyte content around a secret must be safe.
+        let mut s = make_scrubber(vec![("K", "hunter2")]);
+        let out = s.feed("préfix ααα hunter2 βββ suffix with ünïcode padding");
+        let out = format!("{out}{}", s.flush());
+        assert!(out.contains("belmont://K"), "secret scrubbed: {out}");
+        assert!(
+            out.contains("préfix") && out.contains("ünïcode"),
+            "text intact: {out}"
+        );
+        assert!(!out.contains("hunter2"), "secret must not leak: {out}");
+    }
+
+    #[test]
+    fn secret_straddling_the_cut_is_never_emitted_raw() {
+        // Feed byte by byte around the boundary. No emitted output may
+        // ever contain the raw secret.
+        let mut s = make_scrubber(vec![("K", "topsecret")]);
+        let mut emitted = String::new();
+        for ch in "leading padding text topsecret trailing padding text".chars() {
+            emitted.push_str(&s.feed(&ch.to_string()));
+        }
+        emitted.push_str(&s.flush());
+        assert!(
+            !emitted.contains("topsecret"),
+            "raw secret leaked: {emitted}"
+        );
+        assert!(emitted.contains("belmont://K"), "scrubbed: {emitted}");
     }
 
     #[test]
