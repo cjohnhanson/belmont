@@ -28,6 +28,18 @@ pub struct Args {
 pub enum Command {
     /// Initialize Belmont in the current project
     Init,
+    /// Write the man pages into a directory (the package build uses this)
+    #[command(hide = true)]
+    GenMan {
+        /// Output directory for the section-1 pages
+        dir: std::path::PathBuf,
+    },
+    /// Print a shell completion script (the package build uses this)
+    #[command(hide = true)]
+    GenCompletions {
+        /// Target shell
+        shell: clap_complete::Shell,
+    },
     /// List the declared secret references, never the values
     List,
     /// Check that Belmont can resolve every secret
@@ -56,6 +68,17 @@ pub struct SetArgs {
 pub fn run(args: Args) -> Result<()> {
     match args.command {
         Command::Init => cmd_init(&args.root),
+        Command::GenMan { dir } => {
+            use clap::CommandFactory as _;
+            std::fs::create_dir_all(&dir)?;
+            crate::mangen::write_man_pages(&Args::command(), &dir)?;
+            Ok(())
+        }
+        Command::GenCompletions { shell } => {
+            use clap::CommandFactory as _;
+            clap_complete::generate(shell, &mut Args::command(), "belmont", &mut std::io::stdout());
+            Ok(())
+        }
         Command::List => cmd_list(&args.root),
         Command::Check => cmd_check(&args.root),
         Command::Run(run_args) => cmd_run(&args.root, &run_args),

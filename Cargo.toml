@@ -15,6 +15,8 @@ categories = ["command-line-utilities"]
 camino = { version = "1", features = ["serde1"] }
 keyring = { version = "3", features = ["apple-native"] }
 clap = { version = "4", features = ["derive", "env", "unicode", "wrap_help"] }
+clap_complete = "4"
+clap_mangen = "0.2"
 serde = { version = "1", features = ["derive"] }
 serde_yml = "0.0"
 thiserror = "2"

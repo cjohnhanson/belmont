@@ -2,6 +2,7 @@ pub mod backend;
 pub mod cli;
 pub mod config;
 pub mod error;
+pub mod mangen;
 pub mod registry;
 pub mod runner;
 pub mod scrub;
